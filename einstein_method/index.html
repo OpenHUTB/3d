@@ -161,66 +161,67 @@
 <details>
 <summary>查看 Python 代码 - 尺寸量化与 Mesh 缩放</summary>
 
-<pre class="highlight"><code class="language-python">import cv2
-import numpy as np
-import open3d as o3d
-import copy
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">cv2</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">open3d</span> <span class="k">as</span> <span class="nn">o3d</span>
+<span class="kn">import</span> <span class="nn">copy</span>
 
-photo_path = r"标定照片路径"
-mesh_in_path = r"对应模型路径"
-scaled_mesh_out = r"输出缩放后的Mesh路径"
+<span class="n">photo_path</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;标定照片路径&quot;</span>
+<span class="n">mesh_in_path</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;对应模型路径&quot;</span>
+<span class="n">scaled_mesh_out</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;输出缩放后的Mesh路径&quot;</span>
 
-A4_W, A4_H = 210.0, 297.0
+<span class="n">A4_W</span><span class="p">,</span> <span class="n">A4_H</span> <span class="o">=</span> <span class="mf">210.0</span><span class="p">,</span> <span class="mf">297.0</span>
 
-def order_quad_points(pts):
-    s = pts.sum(axis=1)
-    rect = np.zeros((4,2), dtype="float32")
-    rect[0], rect[2] = pts[np.argmin(s)], pts[np.argmax(s)]
-    diff = np.diff(pts, axis=1)
-    rect[1], rect[3] = pts[np.argmin(diff)], pts[np.argmax(diff)]
-    return rect
+<span class="k">def</span> <span class="nf">order_quad_points</span><span class="p">(</span><span class="n">pts</span><span class="p">):</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">pts</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">rect</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span><span class="mi">2</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;float32&quot;</span><span class="p">)</span>
+    <span class="n">rect</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">rect</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">pts</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">s</span><span class="p">)],</span> <span class="n">pts</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">s</span><span class="p">)]</span>
+    <span class="n">diff</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">rect</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">rect</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">pts</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">diff</span><span class="p">)],</span> <span class="n">pts</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">diff</span><span class="p">)]</span>
+    <span class="k">return</span> <span class="n">rect</span>
 
-def detect_a4_corners(img_bgr):
-    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-    gray = cv2.equalizeHist(gray)
-    blur = cv2.GaussianBlur(gray,(5,5),0)
-    edges = cv2.Canny(blur,50,200)
-    contours,_ = cv2.findContours(edges,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-    best, best_score = None, 1e9
-    h_img, w_img = gray.shape
-    for cnt in contours:
-        peri = cv2.arcLength(cnt,True)
-        if peri &lt; 100: continue
-        approx = cv2.approxPolyDP(cnt,0.02*peri,True).reshape(4,2).astype(np.float32)
-        area = abs(cv2.contourArea(approx))
-        if area &lt; (w_img*h_img)*0.0005: continue
-        d = [np.linalg.norm(approx[i]-approx[(i+1)%4]) for i in range(4)]
-        ratio = max(d)/min(d) if min(d)&gt;0 else 1e9
-        score = abs(ratio-1.414)/np.sqrt(area)
-        if score &lt; best_score:
-            best_score = score
-            best = approx.copy()
-    if best is None: raise RuntimeError("未检测到 A4 纸")
-    return order_quad_points(best)
+<span class="k">def</span> <span class="nf">detect_a4_corners</span><span class="p">(</span><span class="n">img_bgr</span><span class="p">):</span>
+    <span class="n">gray</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">cvtColor</span><span class="p">(</span><span class="n">img_bgr</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">COLOR_BGR2GRAY</span><span class="p">)</span>
+    <span class="n">gray</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">equalizeHist</span><span class="p">(</span><span class="n">gray</span><span class="p">)</span>
+    <span class="n">blur</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">GaussianBlur</span><span class="p">(</span><span class="n">gray</span><span class="p">,(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">),</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">edges</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">Canny</span><span class="p">(</span><span class="n">blur</span><span class="p">,</span><span class="mi">50</span><span class="p">,</span><span class="mi">200</span><span class="p">)</span>
+    <span class="n">contours</span><span class="p">,</span><span class="n">_</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">findContours</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span><span class="n">cv2</span><span class="o">.</span><span class="n">RETR_EXTERNAL</span><span class="p">,</span><span class="n">cv2</span><span class="o">.</span><span class="n">CHAIN_APPROX_SIMPLE</span><span class="p">)</span>
+    <span class="n">best</span><span class="p">,</span> <span class="n">best_score</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="mf">1e9</span>
+    <span class="n">h_img</span><span class="p">,</span> <span class="n">w_img</span> <span class="o">=</span> <span class="n">gray</span><span class="o">.</span><span class="n">shape</span>
+    <span class="k">for</span> <span class="n">cnt</span> <span class="ow">in</span> <span class="n">contours</span><span class="p">:</span>
+        <span class="n">peri</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">arcLength</span><span class="p">(</span><span class="n">cnt</span><span class="p">,</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">peri</span> <span class="o">&lt;</span> <span class="mi">100</span><span class="p">:</span> <span class="k">continue</span>
+        <span class="n">approx</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">approxPolyDP</span><span class="p">(</span><span class="n">cnt</span><span class="p">,</span><span class="mf">0.02</span><span class="o">*</span><span class="n">peri</span><span class="p">,</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">area</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">cv2</span><span class="o">.</span><span class="n">contourArea</span><span class="p">(</span><span class="n">approx</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">area</span> <span class="o">&lt;</span> <span class="p">(</span><span class="n">w_img</span><span class="o">*</span><span class="n">h_img</span><span class="p">)</span><span class="o">*</span><span class="mf">0.0005</span><span class="p">:</span> <span class="k">continue</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">approx</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-</span><span class="n">approx</span><span class="p">[(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">%</span><span class="mi">4</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">)]</span>
+        <span class="n">ratio</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">d</span><span class="p">)</span><span class="o">/</span><span class="nb">min</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="k">if</span> <span class="nb">min</span><span class="p">(</span><span class="n">d</span><span class="p">)</span><span class="o">&gt;</span><span class="mi">0</span> <span class="k">else</span> <span class="mf">1e9</span>
+        <span class="n">score</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">ratio</span><span class="o">-</span><span class="mf">1.414</span><span class="p">)</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">area</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">score</span> <span class="o">&lt;</span> <span class="n">best_score</span><span class="p">:</span>
+            <span class="n">best_score</span> <span class="o">=</span> <span class="n">score</span>
+            <span class="n">best</span> <span class="o">=</span> <span class="n">approx</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">best</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;未检测到 A4 纸&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">order_quad_points</span><span class="p">(</span><span class="n">best</span><span class="p">)</span>
 
-def compute_px_per_mm(a4_ordered):
-    w_px = np.linalg.norm(a4_ordered[1]-a4_ordered[0])
-    h_px = np.linalg.norm(a4_ordered[2]-a4_ordered[1])
-    return (w_px/A4_W + h_px/A4_H)/2.0
+<span class="k">def</span> <span class="nf">compute_px_per_mm</span><span class="p">(</span><span class="n">a4_ordered</span><span class="p">):</span>
+    <span class="n">w_px</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">a4_ordered</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">a4_ordered</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">h_px</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">a4_ordered</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">-</span><span class="n">a4_ordered</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">w_px</span><span class="o">/</span><span class="n">A4_W</span> <span class="o">+</span> <span class="n">h_px</span><span class="o">/</span><span class="n">A4_H</span><span class="p">)</span><span class="o">/</span><span class="mf">2.0</span>
 
-def auto_scale_mesh_by_height(mesh_path, out_path, desired_height_mm):
-    mesh = o3d.io.read_triangle_mesh(mesh_path)
-    vertices = np.asarray(mesh.vertices)
-    y_range, z_range = vertices[:,1].max()-vertices[:,1].min(), vertices[:,2].max()-vertices[:,2].min()
-    height_model = z_range if y_range&lt;1e-6 else y_range
-    scale_factor = desired_height_mm/height_model
-    centroid = mesh.get_center()
-    mesh_scaled = copy.deepcopy(mesh)
-    mesh_scaled.translate(-centroid)
-    mesh_scaled.scale(scale_factor, center=(0,0,0))
-    mesh_scaled.translate(centroid)
-    o3d.io.write_triangle_mesh(out_path,mesh_scaled)
-    return out_path, scale_factor, height_model</code></pre>
+<span class="k">def</span> <span class="nf">auto_scale_mesh_by_height</span><span class="p">(</span><span class="n">mesh_path</span><span class="p">,</span> <span class="n">out_path</span><span class="p">,</span> <span class="n">desired_height_mm</span><span class="p">):</span>
+    <span class="n">mesh</span> <span class="o">=</span> <span class="n">o3d</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">read_triangle_mesh</span><span class="p">(</span><span class="n">mesh_path</span><span class="p">)</span>
+    <span class="n">vertices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
+    <span class="n">y_range</span><span class="p">,</span> <span class="n">z_range</span> <span class="o">=</span> <span class="n">vertices</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">-</span><span class="n">vertices</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="n">vertices</span><span class="p">[:,</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">-</span><span class="n">vertices</span><span class="p">[:,</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+    <span class="n">height_model</span> <span class="o">=</span> <span class="n">z_range</span> <span class="k">if</span> <span class="n">y_range</span><span class="o">&lt;</span><span class="mf">1e-6</span> <span class="k">else</span> <span class="n">y_range</span>
+    <span class="n">scale_factor</span> <span class="o">=</span> <span class="n">desired_height_mm</span><span class="o">/</span><span class="n">height_model</span>
+    <span class="n">centroid</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">get_center</span><span class="p">()</span>
+    <span class="n">mesh_scaled</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">mesh</span><span class="p">)</span>
+    <span class="n">mesh_scaled</span><span class="o">.</span><span class="n">translate</span><span class="p">(</span><span class="o">-</span><span class="n">centroid</span><span class="p">)</span>
+    <span class="n">mesh_scaled</span><span class="o">.</span><span class="n">scale</span><span class="p">(</span><span class="n">scale_factor</span><span class="p">,</span> <span class="n">center</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">))</span>
+    <span class="n">mesh_scaled</span><span class="o">.</span><span class="n">translate</span><span class="p">(</span><span class="n">centroid</span><span class="p">)</span>
+    <span class="n">o3d</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">write_triangle_mesh</span><span class="p">(</span><span class="n">out_path</span><span class="p">,</span><span class="n">mesh_scaled</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">out_path</span><span class="p">,</span> <span class="n">scale_factor</span><span class="p">,</span> <span class="n">height_model</span>
+</code></pre></div>
 </details>
 
 <hr />
@@ -282,24 +283,24 @@ def auto_scale_mesh_by_height(mesh_path, out_path, desired_height_mm):
 <details>
 <summary>查看 Python 代码 - UV 展开分析</summary>
 
-<pre class="highlight"><code class="language-python"># UV 量化分析代码
-import os
-import numpy as np
-from PIL import Image
-import csv
-from tqdm import tqdm
-import matplotlib.pyplot as plt
+<div class="highlight"><pre><span></span><code><span class="c1"># UV 量化分析代码</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span>
+<span class="kn">import</span> <span class="nn">csv</span>
+<span class="kn">from</span> <span class="nn">tqdm</span> <span class="kn">import</span> <span class="n">tqdm</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 
-OBJ_PATH = r""       
-UV_IMAGE_PATH = r"" 
-OUTPUT_DIR = r""  
-DISTORTION_THRESHOLD = 3.0
-HEATMAP_COLORMAP = "jet"
+<span class="n">OBJ_PATH</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;&quot;</span>       
+<span class="n">UV_IMAGE_PATH</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;&quot;</span> 
+<span class="n">OUTPUT_DIR</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;&quot;</span>  
+<span class="n">DISTORTION_THRESHOLD</span> <span class="o">=</span> <span class="mf">3.0</span>
+<span class="n">HEATMAP_COLORMAP</span> <span class="o">=</span> <span class="s2">&quot;jet&quot;</span>
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+<span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">OUTPUT_DIR</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-# 这里省略具体函数，可直接使用你提供的完整 UV 分析代码
-</code></pre>
+<span class="c1"># 这里省略具体函数，可直接使用你提供的完整 UV 分析代码</span>
+</code></pre></div>
 </details>
 
 <hr />
@@ -332,7 +333,6 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
       <p>OpenHUTB 版权所有 &copy; 2025</p>
   </div>
 
-  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
 </footer>
           
         </div>

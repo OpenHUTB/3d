@@ -3,9 +3,11 @@
     <url>
          <loc>https://openhutb.github.io/3d/</loc>
          <lastmod>2025-11-25</lastmod>
+         <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openhutb.github.io/3d/einstein_method/</loc>
          <lastmod>2025-11-25</lastmod>
+         <changefreq>daily</changefreq>
     </url>
 </urlset>
